@@ -14,31 +14,34 @@ plugins {
 
 repositories {
     mavenLocal()
-    maven("https://repo.xenondevs.xyz/releases") {
-        name = "InvUI"
-    }
+    maven("https://repo.xenondevs.xyz/releases") { name = "InvUI" }
+    maven("https://repo.papermc.io/repository/maven-public/")
+    mavenCentral()
 }
 
 dependencies {
-    fun paperLibraryApi(dependency: Any) {
-        paperLibrary(dependency)
-        compileOnlyApi(dependency)
+    fun paperLibraryApi(dep: Any) {
+        paperLibrary(dep)
+        compileOnlyApi(dep)
     }
 
     runtimeOnly(project(":nms"))
 
+    // Kotlin 2.1.10 toolchain
     paperLibraryApi("org.jetbrains.kotlin:kotlin-stdlib:2.1.10")
     paperLibraryApi("org.jetbrains.kotlin:kotlin-reflect:2.1.10")
     paperLibraryApi("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
+    // Updated Paper API for 1.21.10
     compileOnly("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
 
+    // Bukkit / coroutine & InvUI dependencies
     paperLibraryApi("com.github.shynixn.mccoroutine:mccoroutine-bukkit-api:2.22.0")
     paperLibraryApi("com.github.shynixn.mccoroutine:mccoroutine-bukkit-core:2.22.0")
     paperLibraryApi("xyz.xenondevs.invui:invui-core:1.47")
-    // see https://github.com/NichtStudioCode/InvUI/blob/main/inventoryaccess/inventory-access/src/main/java/xyz/xenondevs/inventoryaccess/version/InventoryAccessRevision.java
     paperLibrary("xyz.xenondevs.invui:inventory-access-r25:1.47:remapped-mojang")
     paperLibraryApi("xyz.xenondevs.invui:invui-kotlin:1.46")
+
     api("com.github.Tofaa2.EntityLib:spigot:2.4.11")
     implementation("com.github.retrooper:packetevents-spigot:2.10.0")
     implementation("info.debatty:java-string-similarity:2.0.0")
@@ -81,8 +84,8 @@ dokka {
     }
     dokkaSourceSets.configureEach {
         externalDocumentationLinks.register("Paper") {
-            url("https://jd.papermc.io/paper/1.21.8/")
-            packageListUrl("https://jd.papermc.io/paper/1.21.8/element-list")
+            url("https://jd.papermc.io/paper/1.21.10/")
+            packageListUrl("https://jd.papermc.io/paper/1.21.10/element-list")
         }
         externalDocumentationLinks.register("JOML") {
             url("https://javadoc.io/doc/org.joml/joml/latest/")
@@ -98,32 +101,30 @@ dokka {
         }
         sourceLink {
             localDirectory.set(file("src/main/kotlin"))
-            remoteUrl("https://github.com/pylonmc/pylon-core")
+            remoteUrl("https://github.com/wickidcow/pylon-core")
             remoteLineSuffix.set("#L")
         }
     }
-    dokkaPublications.configureEach {
-        suppressObviousFunctions = true
-    }
+    dokkaPublications.configureEach { suppressObviousFunctions = true }
 }
 
 tasks.dokkaGeneratePublicationJavadoc {
-    // Fixes search lag by limiting the number of results shown
-    // See https://github.com/Kotlin/dokka/issues/4284
     doLast {
         val searchJs = layout.buildDirectory.file("dokka/docs/javadoc/search.js").get().asFile
         val text = searchJs.readText()
         val codeToFix = "const result = [...modules, ...packages, ...types, ...members, ...tags]"
         if (codeToFix !in text) {
-            throw IllegalStateException("Seggan you buffoon, you updated dokka without checking to see if the search fix still works")
+            throw IllegalStateException("Seggan you buffoon, verify Dokka search fix still applies")
         }
-        val fixed = "const result = [" +
-                "...modules.slice(0, 5), " +
-                "...packages.slice(0, 5), " +
-                "...types.slice(0, 40), " +
-                "...members.slice(0, 40), " +
-                "...tags.slice(0, 5)" +
-                "]"
+        val fixed = """
+            const result = [
+                ...modules.slice(0, 5),
+                ...packages.slice(0, 5),
+                ...types.slice(0, 40),
+                ...members.slice(0, 40),
+                ...tags.slice(0, 5)
+            ]
+        """.trimIndent()
         searchJs.writeText(text.replace(codeToFix, fixed))
     }
 }
@@ -151,7 +152,6 @@ tasks.shadowJar {
 
 paper {
     generateLibrariesJson = true
-
     name = "PylonCore"
     loader = "io.github.pylonmc.pylon.core.PylonLoader"
     bootstrapper = "io.github.pylonmc.pylon.core.PylonBootstrapper"
@@ -162,15 +162,12 @@ paper {
     load = BukkitPluginDescription.PluginLoadOrder.STARTUP
 }
 
-tasks.withType<Jar> {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
+tasks.withType<Jar> { duplicatesStrategy = DuplicatesStrategy.INCLUDE }
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             artifactId = "pylon-core"
-
             artifact(tasks.jar)
             artifact(tasks.kotlinSourcesJar)
             artifact(javadocJar)
@@ -178,7 +175,7 @@ publishing {
             pom {
                 name = artifactId
                 description = "The core library for Pylon addons."
-                url = "https://github.com/pylonmc/pylon-core"
+                url = "https://github.com/wickidcow/pylon-core"
                 licenses {
                     license {
                         name = "GNU Lesser General Public License Version 3"
@@ -193,21 +190,20 @@ publishing {
                     }
                 }
                 scm {
-                    connection = "scm:git:git://github.com/pylonmc/pylon-core.git"
-                    developerConnection = "scm:git:ssh://github.com:pylonmc/pylon-core.git"
-                    url = "https://github.com/pylonmc/pylon-core"
+                    connection = "scm:git:git://github.com/wickidcow/pylon-core.git"
+                    developerConnection = "scm:git:ssh://github.com:wickidcow/pylon-core.git"
+                    url = "https://github.com/wickidcow/pylon-core"
                 }
-                // Bypass maven-publish erroring when using `from(components["java"])`
                 withXml {
                     val root = asNode()
                     val dependenciesNode = root.appendNode("dependencies")
                     val configs = listOf(configurations.compileOnlyApi, configurations.api)
                     configs.flatMap { it.get().dependencies }.forEach {
-                        val dependencyNode = dependenciesNode.appendNode("dependency")
-                        dependencyNode.appendNode("groupId", it.group)
-                        dependencyNode.appendNode("artifactId", it.name)
-                        dependencyNode.appendNode("version", it.version)
-                        dependencyNode.appendNode("scope", "compile")
+                        val depNode = dependenciesNode.appendNode("dependency")
+                        depNode.appendNode("groupId", it.group)
+                        depNode.appendNode("artifactId", it.name)
+                        depNode.appendNode("version", it.version)
+                        depNode.appendNode("scope", "compile")
                     }
                 }
             }
@@ -217,11 +213,10 @@ publishing {
 
 signing {
     useInMemoryPgpKeys(System.getenv("SIGNING_KEY"), System.getenv("SIGNING_PASSWORD"))
-
     sign(publishing.publications["maven"])
 }
 
-tasks.withType(Sign::class) {
+tasks.withType<Sign> {
     onlyIf {
         System.getenv("SIGNING_KEY") != null && System.getenv("SIGNING_PASSWORD") != null
     }
