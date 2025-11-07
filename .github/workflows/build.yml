@@ -1,12 +1,15 @@
-name: Build and Release
+name: Build and Release (Pylon Core)
 
 on:
   push:
     branches:
       - main
+      - master
       - 1.21.10-compat
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -15,28 +18,33 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      # 1️⃣ Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      # 2️⃣ Setup Java 21
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: 21
           distribution: temurin
 
+      # 3️⃣ Validate Gradle wrapper
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v2
 
+      # 4️⃣ Build jar
       - name: Build with Gradle
         uses: gradle/gradle-build-action@v3
         with:
-          arguments: clean build
+          arguments: clean shadowJar
 
-      - name: Upload built jar
+      # 5️⃣ Upload jar to GitHub release
+      - name: Upload built JAR to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: "Build #${{ github.run_number }} for ${{ github.repository }}"
-          files: |
-            build/libs/*.jar
+          files: build/libs/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
